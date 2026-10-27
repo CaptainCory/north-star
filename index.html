@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>North Star — Goal Wizard</title>
+<meta name="description" content="Find your north star, forge brilliant goals, and write the constitution your life — and your AI — runs on.">
+<style>
+:root{--bg:#0d1020;--ink:#efe9dc;--dim:#a49d8f;--gold:#e8b44a;--card:#171b31}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1d2347,#0d1020 60%);color:var(--ink);font:18px/1.6 Georgia,serif;min-height:100vh}
+main{max-width:680px;margin:auto;padding:28px 20px 80px}h1{font-size:2.3em;margin:.3em 0;color:var(--gold)}h2{color:var(--gold);font-weight:normal}
+.star{font-size:3em;text-align:center}.bar{height:4px;background:#2a2f52;border-radius:2px;margin:18px 0}.bar i{display:block;height:100%;background:var(--gold);border-radius:2px;transition:width .4s}
+.stage{color:var(--dim);font-size:.85em;letter-spacing:.12em;text-transform:uppercase}.q{font-size:1.35em;margin:.4em 0}.hint{color:var(--dim);font-style:italic}
+textarea,input{width:100%;background:var(--card);color:var(--ink);border:1px solid #2f355e;border-radius:10px;padding:14px;font:inherit;margin:10px 0}
+textarea{min-height:140px}button{background:var(--gold);color:#1a1405;border:0;border-radius:10px;padding:12px 20px;font:inherit;font-weight:bold;cursor:pointer;margin:6px 6px 0 0}
+button.ghost{background:transparent;color:var(--dim);border:1px solid #2f355e}.card{background:var(--card);border-radius:14px;padding:18px 20px;margin:14px 0}
+pre{white-space:pre-wrap;font:15px/1.5 ui-monospace,Menlo,monospace;background:#0a0c18;padding:16px;border-radius:10px}small{color:var(--dim)}
+</style></head><body><main id="app"></main>
+<script>
+// Pure data
+const STEPS = [
+ {stage:"Depths",id:"life",q:"You're 100, looking back. What would make you say, \"That was a life\"?",hint:"Scenes, people, feelings — not achievements alone."},
+ {stage:"Depths",id:"flow",q:"When do you lose track of time? Name the last three times.",hint:"Absorption is a compass."},
+ {stage:"Depths",id:"envy",q:"Whom do you envy, and for what exactly?",hint:"Envy is desire in disguise."},
+ {stage:"Depths",id:"tolerate",q:"What are you tolerating that you've stopped noticing?",hint:"Small drains, chronic compromises."},
+ {stage:"Depths",id:"nofail",q:"What would you attempt if it couldn't fail? And what would you do even if it couldn't succeed?",hint:"The second answer is pure love."},
+ {stage:"Depths",id:"values",q:"Name your 3–5 core values. Which one does your current calendar contradict?",hint:""},
+ {stage:"Gardens",id:"health",q:"HEALTH — Where is it now (1–10, with one fact)? What would a 10 look like in 12 months?",hint:"Body, sleep, energy, mind."},
+ {stage:"Gardens",id:"relationships",q:"RELATIONSHIPS — Now (1–10)? What would a 10 look like?",hint:"Partner, family, friends, community."},
+ {stage:"Gardens",id:"money",q:"MONEY & WORK — Now (1–10)? What would a 10 look like?",hint:"Income, freedom, meaningful work."},
+ {stage:"Gardens",id:"creativity",q:"CREATIVITY — Now (1–10)? What would a 10 look like?",hint:"What you make and express."},
+ {stage:"Gardens",id:"mastery",q:"MASTERY — Now (1–10)? What would a 10 look like?",hint:"Skills, learning, craft."},
+ {stage:"Gardens",id:"adventure",q:"ADVENTURE & PLAY — Now (1–10)? What would a 10 look like?",hint:"Travel, joy, wonder."},
+ {stage:"North Star",id:"right",q:"Across everything you've written: what could go RIGHT? What is the highest you could reach?",hint:"Dare the big version."},
+ {stage:"North Star",id:"northstar",q:"Write your North Star in one sentence: the single direction that makes the rest easier or unnecessary.",hint:"A direction, not a finish line."},
+ {stage:"Forge",id:"goals",q:"Name up to 3 goals that serve your North Star. One per line.",hint:"Each should scare and thrill you a little.",multi:true},
+];
+const FORGE = [
+ ["why","Why","Why does this matter? One honest sentence."],
+ ["outcome","Outcome","Measurable outcome: metric, starting point, target, and date."],
+ ["lead","Lead measures","Weekly actions fully in your control (lead measures)."],
+ ["friction","Friction design","What will you make easier? What will you make harder?"],
+ ["feedback","Feedback","How will you see progress, and how often will you review?"],
+ ["pivot","Pivot criteria","When will you drop or reshape this goal?"],
+];
+const CONST_Q = [
+ ["purpose","What is your life, and any AI acting for you, ultimately for?"],
+ ["never","What must never be done on your behalf, no matter the gain?"],
+ ["priority","When things conflict, what wins? Rank: health, people, goals, money, comfort…"],
+ ["voice","How should an assistant speak to you and act for you?"],
+ ["rules","Your iron-clad personal rules (one per line)."],
+];
+// Pure helpers
+const KEY="northstar.v1";
+const empty=()=>({i:0,a:{},g:[],gi:0,fi:0,f:{},c:{},ci:0,phase:"intro"});
+const load=()=>{try{return {...empty(),...JSON.parse(localStorage.getItem(KEY))}}catch{return empty()}};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const goalsFrom=t=>(t||"").split("\n").map(s=>s.trim()).filter(Boolean).slice(0,3);
+const lines=t=>(t||"").split("\n").map(s=>s.trim()).filter(Boolean);
+const total=s=>STEPS.length+s.g.length*FORGE.length+CONST_Q.length;
+const done=s=>s.phase==="steps"?s.i:s.phase==="forge"?STEPS.length+s.gi*FORGE.length+s.fi:s.phase==="const"?STEPS.length+s.g.length*FORGE.length+s.ci:total(s);
+const md=s=>[
+ `# My North Star\n\n> ${s.a.northstar||""}\n`,
+ `## Goals`,...s.g.map((g,k)=>`\n### ${k+1}. ${g}\n`+FORGE.map(([id,l])=>`- **${l}:** ${(s.f[k]||{})[id]||""}`).join("\n")),
+ `\n# My Constitution\n_Highest rules for me and any AI acting on my behalf. Higher articles win conflicts._\n`,
+ `## I. Purpose\n${s.c.purpose||""}`,
+ `## II. Never\n${lines(s.c.never).map(x=>"- "+x).join("\n")}`,
+ `## III. Priorities\n${s.c.priority||""}`,
+ `## IV. The Loop\nEvery action traces to a goal: data → intention → action → feedback. Close every loop.`,
+ `## V. Voice & conduct\n${s.c.voice||""}`,
+ `## VI. Open-endedness\nGoals are hypotheses. Leave room for surprise; no metric overrides what it measures.`,
+ `## VII. Iron-clad rules\n${lines(s.c.rules).map(x=>"- "+x).join("\n")}`,
+ `\n## Values\n${s.a.values||""}`,
+ `\n---\nMade with North Star · ${new Date().toISOString().slice(0,10)}`].join("\n\n");
+// Views (pure: state -> html)
+const ask=(stage,q,hint,val,s)=>`<div class=stage>${esc(stage)}</div><div class=bar><i style="width:${Math.round(100*done(s)/total(s))}%"></i></div>
+ <p class=q>${esc(q)}</p>${hint?`<p class=hint>${esc(hint)}</p>`:""}<textarea id=ans autofocus>${esc(val)}</textarea>
+ <button data-act=next>Continue →</button><button class=ghost data-act=back>Back</button>`;
+const view=s=>{
+ if(s.phase==="intro")return `<div class=star>✦</div><h1>North Star</h1><p>A guided conversation with yourself. It takes 30–60 minutes and goes deep: who you are, what you want, the goals worth your life — and a constitution: the highest rules you, and any AI working for you, should follow.</p>
+  <div class=card><small>Private by design: your answers never leave this device. They're saved in your browser, and you can export them at the end.</small></div>
+  <button data-act=start>${s.i||s.phase!=="intro"&&Object.keys(s.a).length?"Continue":"Begin"}</button>${Object.keys(s.a).length?`<button class=ghost data-act=reset>Start over</button>`:""}`;
+ if(s.phase==="steps"){const st=STEPS[s.i];return ask(st.stage,st.q,st.hint,s.a[st.id],s)}
+ if(s.phase==="forge"){const [id,,q]=FORGE[s.fi];return `<div class=card><small>Goal ${s.gi+1} of ${s.g.length}</small><h2>${esc(s.g[s.gi])}</h2></div>`+ask("Forge",q,"",(s.f[s.gi]||{})[id],s)}
+ if(s.phase==="const"){const [id,q]=CONST_Q[s.ci];return ask("Constitution",q,"",s.c[id],s)}
+ return `<div class=star>✦</div><h1>Your North Star</h1><div class=card><p class=q>${esc(s.a.northstar)}</p></div>
+  <button data-act=copy>Copy all</button><button data-act=dl>Download .md</button><button class=ghost data-act=edit>Revise</button><button class=ghost data-act=reset>Start over</button>
+  <pre>${esc(md(s))}</pre><p><small>Paste this into your notes, or give it to your AI assistant as its guiding document. Revisit quarterly.</small></p>`;
+};
+// Pure transitions
+const advance=(s,val)=>{
+ if(s.phase==="steps"){const st=STEPS[s.i],a={...s.a,[st.id]:val};
+  if(s.i<STEPS.length-1)return {...s,a,i:s.i+1};
+  const g=goalsFrom(a.goals);return g.length?{...s,a,g,phase:"forge",gi:0,fi:0}:{...s,a,phase:"const",ci:0}}
+ if(s.phase==="forge"){const f={...s.f,[s.gi]:{...(s.f[s.gi]||{}),[FORGE[s.fi][0]]:val}};
+  if(s.fi<FORGE.length-1)return {...s,f,fi:s.fi+1};
+  return s.gi<s.g.length-1?{...s,f,gi:s.gi+1,fi:0}:{...s,f,phase:"const",ci:0}}
+ if(s.phase==="const"){const c={...s.c,[CONST_Q[s.ci][0]]:val};return s.ci<CONST_Q.length-1?{...s,c,ci:s.ci+1}:{...s,c,phase:"done"}}
+ return s};
+const retreat=s=>s.phase==="steps"?(s.i?{...s,i:s.i-1}:{...s,phase:"intro"}):s.phase==="forge"?(s.fi?{...s,fi:s.fi-1}:s.gi?{...s,gi:s.gi-1,fi:FORGE.length-1}:{...s,phase:"steps",i:STEPS.length-1})
+ :s.phase==="const"?(s.ci?{...s,ci:s.ci-1}:s.g.length?{...s,phase:"forge",gi:s.g.length-1,fi:FORGE.length-1}:{...s,phase:"steps",i:STEPS.length-1}):s;
+// Effects adapter
+let S=load();
+const render=()=>{localStorage.setItem(KEY,JSON.stringify(S));document.getElementById("app").innerHTML=view(S);document.getElementById("ans")?.focus();scrollTo(0,0)};
+const val=()=>document.getElementById("ans")?.value.trim()??"";
+const ACT={start:s=>s.phase==="intro"?{...s,phase:Object.keys(s.a).length&&s.phase==="intro"?(s.c&&Object.keys(s.c).length===CONST_Q.length?"done":"steps"):"steps"}:s,
+ next:s=>advance(s,val()),back:retreat,edit:s=>({...s,phase:"steps",i:0}),
+ reset:s=>confirm("Erase all answers?")?empty():s,
+ copy:s=>(navigator.clipboard.writeText(md(s)),alert("Copied."),s),
+ dl:s=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([md(s)],{type:"text/markdown"}));a.download="north-star.md";a.click();return s}};
+document.addEventListener("click",e=>{const k=e.target.dataset.act;if(k){S=ACT[k](S);render()}});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)&&document.getElementById("ans")){S=advance(S,val());render()}});
+render();
+</script></body></html>
