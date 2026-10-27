@@ -30,6 +30,7 @@ const STEPS = [
  {stage:"Gardens",id:"mastery",q:"MASTERY — Now (1–10)? What would a 10 look like?",hint:"Skills, learning, craft."},
  {stage:"Gardens",id:"adventure",q:"ADVENTURE & PLAY — Now (1–10)? What would a 10 look like?",hint:"Travel, joy, wonder."},
  {stage:"North Star",id:"right",q:"Across everything you've written: what could go RIGHT? What is the highest you could reach?",hint:"Dare the big version."},
+ {stage:"Counterfactuals",id:"cf_north",q:"Flip it: suppose your answers above are wrong — that what you think you want would not make you happy. What would you want instead?",hint:"If nothing comes, your instincts may be solid. If something does, take it seriously."},
  {stage:"North Star",id:"northstar",q:"Write your North Star in one sentence: the single direction that makes the rest easier or unnecessary.",hint:"A direction, not a finish line."},
  {stage:"Forge",id:"goals",q:"Name up to 3 goals that serve your North Star. One per line.",hint:"Each should scare and thrill you a little.",multi:true},
 ];
@@ -38,6 +39,9 @@ const FORGE = [
  ["outcome","Outcome","Measurable outcome: metric, starting point, target, and date."],
  ["lead","Lead measures","Weekly actions fully in your control (lead measures)."],
  ["friction","Friction design","What will you make easier? What will you make harder?"],
+ ["premortem","Pre-mortem","Counterfactual: a year from now this goal clearly failed. What is the most believable reason?"],
+ ["rival","Rival path","If you never pursued this goal, what would you do with the time instead? Could that be better?"],
+ ["evidence","Disconfirming evidence","What early evidence would show you're on the wrong track, and when will you check for it?"],
  ["feedback","Feedback","How will you see progress, and how often will you review?"],
  ["pivot","Pivot criteria","When will you drop or reshape this goal?"],
 ];
@@ -69,6 +73,7 @@ const md=s=>[
  `## VI. Open-endedness\nGoals are hypotheses. Leave room for surprise; no metric overrides what it measures.`,
  `## VII. Iron-clad rules\n${lines(s.c.rules).map(x=>"- "+x).join("\n")}`,
  `\n## Values\n${s.a.values||""}`,
+ `\n## Counterfactual check\n${s.a.cf_north||""}`,
  `\n---\nMade with North Star · ${new Date().toISOString().slice(0,10)}`].join("\n\n");
 // Views (pure: state -> html)
 const ask=(stage,q,hint,val,s)=>`<div class=stage>${esc(stage)}</div><div class=bar><i style="width:${Math.round(100*done(s)/total(s))}%"></i></div>
