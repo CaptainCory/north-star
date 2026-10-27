@@ -10,6 +10,7 @@ main{max-width:680px;margin:auto;padding:28px 20px 80px}h1{font-size:2.3em;margi
 .stage{color:var(--dim);font-size:.85em;letter-spacing:.12em;text-transform:uppercase}.q{font-size:1.35em;margin:.4em 0}.hint{color:var(--dim);font-style:italic}
 textarea,input{width:100%;background:var(--card);color:var(--ink);border:1px solid #2f355e;border-radius:10px;padding:14px;font:inherit;margin:10px 0}
 textarea{min-height:140px}button{background:var(--gold);color:#1a1405;border:0;border-radius:10px;padding:12px 20px;font:inherit;font-weight:bold;cursor:pointer;margin:6px 6px 0 0}
+button.mic{background:#2a2f52;color:var(--ink)}button.mic.on{background:#c0392b;color:#fff;animation:p 1.2s infinite}@keyframes p{50%{opacity:.6}}
 button.ghost{background:transparent;color:var(--dim);border:1px solid #2f355e}.card{background:var(--card);border-radius:14px;padding:18px 20px;margin:14px 0}
 pre{white-space:pre-wrap;font:15px/1.5 ui-monospace,Menlo,monospace;background:#0a0c18;padding:16px;border-radius:10px}small{color:var(--dim)}
 </style></head><body><main id="app"></main>
@@ -72,10 +73,10 @@ const md=s=>[
 // Views (pure: state -> html)
 const ask=(stage,q,hint,val,s)=>`<div class=stage>${esc(stage)}</div><div class=bar><i style="width:${Math.round(100*done(s)/total(s))}%"></i></div>
  <p class=q>${esc(q)}</p>${hint?`<p class=hint>${esc(hint)}</p>`:""}<textarea id=ans autofocus>${esc(val)}</textarea>
- <button data-act=next>Continue →</button><button class=ghost data-act=back>Back</button>`;
+ ${SR?`<button class=mic id=mic data-act=mic>🎙 Speak</button>`:""}<button data-act=next>Continue →</button><button class=ghost data-act=back>Back</button>`;
 const view=s=>{
  if(s.phase==="intro")return `<div class=star>✦</div><h1>North Star</h1><p>A guided conversation with yourself. It takes 30–60 minutes and goes deep: who you are, what you want, the goals worth your life — and a constitution: the highest rules you, and any AI working for you, should follow.</p>
-  <div class=card><small>Private by design: your answers never leave this device. They're saved in your browser, and you can export them at the end.</small></div>
+  <div class=card><small>Private by design: your answers never leave this device. They're saved in your browser, and you can export them at the end. Voice input uses your browser's built-in speech recognition (which may process audio with your browser maker, e.g. Apple or Google).</small></div>
   <button data-act=start>${s.i||s.phase!=="intro"&&Object.keys(s.a).length?"Continue":"Begin"}</button>${Object.keys(s.a).length?`<button class=ghost data-act=reset>Start over</button>`:""}`;
  if(s.phase==="steps"){const st=STEPS[s.i];return ask(st.stage,st.q,st.hint,s.a[st.id],s)}
  if(s.phase==="forge"){const [id,,q]=FORGE[s.fi];return `<div class=card><small>Goal ${s.gi+1} of ${s.g.length}</small><h2>${esc(s.g[s.gi])}</h2></div>`+ask("Forge",q,"",(s.f[s.gi]||{})[id],s)}
@@ -97,6 +98,16 @@ const advance=(s,val)=>{
 const retreat=s=>s.phase==="steps"?(s.i?{...s,i:s.i-1}:{...s,phase:"intro"}):s.phase==="forge"?(s.fi?{...s,fi:s.fi-1}:s.gi?{...s,gi:s.gi-1,fi:FORGE.length-1}:{...s,phase:"steps",i:STEPS.length-1})
  :s.phase==="const"?(s.ci?{...s,ci:s.ci-1}:s.g.length?{...s,phase:"forge",gi:s.g.length-1,fi:FORGE.length-1}:{...s,phase:"steps",i:STEPS.length-1}):s;
 // Effects adapter
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null;
+const toggleMic=()=>{const b=document.getElementById("mic"),t=document.getElementById("ans");
+ if(rec){rec.stop();return}
+ rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang=navigator.language||"en-US";
+ const base=t.value?t.value.trimEnd()+" ":"";
+ rec.onresult=e=>{t.value=base+Array.from(e.results).map(r=>r[0].transcript).join("")};
+ rec.onend=()=>{rec=null;b?.classList.remove("on");if(b)b.textContent="🎙 Speak"};
+ rec.onerror=e=>{if(e.error==="not-allowed")alert("Microphone permission denied.")};
+ rec.start();b.classList.add("on");b.textContent="■ Stop"};
 let S=load();
 const render=()=>{localStorage.setItem(KEY,JSON.stringify(S));document.getElementById("app").innerHTML=view(S);document.getElementById("ans")?.focus();scrollTo(0,0)};
 const val=()=>document.getElementById("ans")?.value.trim()??"";
@@ -105,7 +116,7 @@ const ACT={start:s=>s.phase==="intro"?{...s,phase:Object.keys(s.a).length&&s.pha
  reset:s=>confirm("Erase all answers?")?empty():s,
  copy:s=>(navigator.clipboard.writeText(md(s)),alert("Copied."),s),
  dl:s=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([md(s)],{type:"text/markdown"}));a.download="north-star.md";a.click();return s}};
-document.addEventListener("click",e=>{const k=e.target.dataset.act;if(k){S=ACT[k](S);render()}});
+document.addEventListener("click",e=>{const k=e.target.dataset.act;if(k==="mic")return toggleMic();if(k){rec?.stop();S=ACT[k](S);render()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)&&document.getElementById("ans")){S=advance(S,val());render()}});
 render();
 </script></body></html>
